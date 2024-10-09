@@ -6,6 +6,7 @@ class DBConfig:
         self.dbpath = dbpath
         self.pageSize=pageSize
         self.dm_maxfilesize=dm_maxfilesize
+        self.oui = oui 
     
 
     def get_dbpath(self):
