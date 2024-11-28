@@ -55,7 +55,13 @@ class Relation:
                                 textCol += "$"
                         buff[posRel:posRel + taille] = struct.pack('f', textCol)
                         index += 1
-            return posRel - pos
+
+            tailleRecord = posRel - pos
+            offset = len(buff) - (8 + 8 + (pos / tailleRecord))
+            buff[offset:offset + 4] = struct.pack('i', pos)
+            buff[offset + 4:offset + 8] = struct.pack('i', tailleRecord)
+            buff[12:16] = struct.pack('i', 1) #mettre val dirty a 1
+            return tailleRecord
 
         else:
             posRel = pos  # la on vas incrire les tailles des cols
@@ -95,68 +101,75 @@ class Relation:
                         posRel += 4
                         posRel1 += len(record[index])
                         index += 1
+
+            tailleRecord = posRel - pos
+            offset = len(buff) - (8 + 8 + (pos / tailleRecord))
+            buff[offset:offset + 4] = struct.pack('i', pos)
+            buff[offset + 4:offset + 8] = struct.pack('i', tailleRecord)
+            buff[12:16] = struct.pack('i', 1) #mettre val dirty a 1
+            return tailleRecord
+
+
+    def readFromBuffer(self, record, buff, pos):
+        if self.tailleVar == False:
+            posRel = pos
+            index = 0
+            for col in self.col_info_list:
+                match col.colType:
+                    case "INT":
+                        record[index] = struct.unpack('i', buff[posRel:posRel + 4])[0]
+                        posRel += 4
+                        index += 1
+                    case "FLOAT":
+                        record[index] = struct.unpack('i', buff[posRel:posRel + 4])[0]
+                        posRel += 4
+                        index += 1
+                    case _ if col.ColType.startswith("CHAR"):
+                        tailleTxt = ""
+                        for i in range(5, len(col.colType)):
+                            if (col.colType[i] != ")"):
+                                tailleTxt += col.colType[i]
+                            else:
+                                break
+                        taille = int(tailleTxt)
+                        record[index] = struct.unpack('f', buff[posRel:posRel + taille])[0]
+                        index += 1
+            return posRel - pos
+
+        else:
+            posRel = pos  # la on vas incrire les tailles des cols
+            posRel1 = pos + self.nbCollumn * 4  # la c'est les valeurs des cols
+            index = 0
+            for col in self.col_info_list:
+                match col.colType:
+                    case "INT":
+                        record[index] = struct.unpack('i', buff[posRel1:posRel1 + 4])[0]
+                        posRel += 4
+                        posRel1 += 4
+                        index += 1
+                    case "FLOAT":
+                        record[index] = struct.unpack('i', buff[posRel1:posRel1 + 4])[0]
+                        posRel += 4
+                        posRel1 += 4
+                        index += 1
+                    case "CHAR(T)":
+                        taille = struct.unpack('i', buff[posRel:posRel + 4])[0]
+                        text = struct.unpack(f'{taille}s', buff[posRel1:posRel1 + taille])[0]
+                        val = ""
+                        for i in range(taille):
+                            if text[i] != '$':
+                                val = val + text[i]
+                        record[index] = val
+                        posRel += 4
+                        posRel1 += posRel1 + taille
+                        index += 1
+                    case "VARCHAR(T)":
+                        taille = struct.unpack('i', buff[posRel:posRel + 4])[0]
+                        record[index] = struct.unpack(f'{taille}s', buff[posRel1:posRel1 + taille])[0]
+                        posRel += 4
+                        posRel1 += posRel1 + taille
+                        index += 1
             return posRel1 - pos
-
-
-def readFromBuffer(self, record, buff, pos):
-    if self.tailleVar == False:
-        posRel = pos
-        index = 0
-        for col in self.col_info_list:
-            match col.colType:
-                case "INT":
-                    record[index] = struct.unpack('i', buff[posRel:posRel + 4])[0]
-                    posRel += 4
-                    index += 1
-                case "FLOAT":
-                    record[index] = struct.unpack('i', buff[posRel:posRel + 4])[0]
-                    posRel += 4
-                    index += 1
-                case _ if col.ColType.startswith("CHAR"):
-                    tailleTxt = ""
-                    for i in range(5, len(col.colType)):
-                        if (col.colType[i] != ")"):
-                            tailleTxt += col.colType[i]
-                        else:
-                            break
-                    taille = int(tailleTxt)
-                    record[index] = struct.unpack('f', buff[posRel:posRel + taille])[0]
-                    index += 1
-        return posRel - pos
-
-    else:
-        posRel = pos  # la on vas incrire les tailles des cols
-        posRel1 = pos + self.nbCollumn * 4  # la c'est les valeurs des cols
-        index = 0
-        for col in self.col_info_list:
-            match col.colType:
-                case "INT":
-                    record[index] = struct.unpack('i', buff[posRel1:posRel1 + 4])[0]
-                    posRel += 4
-                    posRel1 += 4
-                    index += 1
-                case "FLOAT":
-                    record[index] = struct.unpack('i', buff[posRel1:posRel1 + 4])[0]
-                    posRel += 4
-                    posRel1 += 4
-                    index += 1
-                case "CHAR(T)":
-                    taille = struct.unpack('i', buff[posRel:posRel + 4])[0]
-                    text = struct.unpack(f'{taille}s', buff[posRel1:posRel1 + taille])[0]
-                    for i in range(taille):
-                        if text[i] != '$':
-                            val = val + text[i]
-                    record[index] = val
-                    posRel += 4
-                    posRel1 += posRel1 + taille
-                    index += 1
-                case "VARCHAR(T)":
-                    taille = struct.unpack('i', buff[posRel:posRel + 4])[0]
-                    record[index] = struct.unpack(f'{taille}s', buff[posRel1:posRel1 + taille])[0]
-                    posRel += 4
-                    posRel1 += posRel1 + taille
-                    index += 1
-        return posRel1 - pos
 
 def addDataPage(self):
         bufferManager = self.bufferManager
