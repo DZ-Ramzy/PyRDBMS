@@ -28,8 +28,8 @@ class Relation:
         return self.headerPageId
 
     def writeRecordToBuffer(self, record, buff, pos):
-        posRel = pos
-        if not self.tailleVar:  # Mode fixe
+        if self.tailleVar == False:
+            posRel = pos
             index = 0
             for col in self.col_info_list:
                 match col.colType:
@@ -41,59 +41,62 @@ class Relation:
                         buff[posRel:posRel + 4] = struct.pack('f', record[index])
                         posRel += 4
                         index += 1
-                    case "CHAR(T)":
-                        T = col.size  # On suppose que la taille T est définie dans col.size
-                        value = record[index].ljust(T, '$')[:T]  # Remplir avec '$' si nécessaire
-                        buff[posRel:posRel + T] = value.encode('utf-8')
-                        posRel += T
+                    case _ if col.ColType.startswith("CHAR"):
+                        tailleTxt = ""
+                        for i in range(5, len(col.colType)):
+                            if (col.colType[i] != ")"):
+                                tailleTxt += col.colType[i]
+                            else:
+                                break
+                        taille = int(tailleTxt)
+                        textCol = record[index]
+                        if len(record[index]) < taille:
+                            for i in range(len(textCol), taille):
+                                textCol += "$"
+                        buff[posRel:posRel + taille] = struct.pack('f', textCol)
                         index += 1
-                    case "VARCHAR(T)":
-                        T = col.size  # Taille maximale de VARCHAR
-                        value = record[index][:T]  # Tronquer si la chaîne est plus grande que T
-                        actual_length = len(value)
-                        buff[posRel:posRel + 4] = struct.pack('i', actual_length)  # Longueur réelle
-                        buff[posRel + 4:posRel + 4 + actual_length] = value.encode('utf-8')
-                        posRel += 4 + actual_length
-                        index += 1
-
             return posRel - pos
 
-        else:  # Mode variable
-            posRel1 = pos + self.nbCollumn * 4  # Position pour les valeurs des colonnes
+        else:
+            posRel = pos  # la on vas incrire les tailles des cols
+            posRel1 = pos + self.nbCollumn * 4  # la c'est les valeurs des cols
             index = 0
             for col in self.col_info_list:
                 match col.colType:
                     case "INT":
-                        buff[posRel:posRel + 4] = struct.pack('i', 4)  # Taille de l'entier
+                        buff[posRel:posRel + 4] = struct.pack('i', 4)
                         buff[posRel1:posRel1 + 4] = struct.pack('i', record[index])
                         posRel += 4
                         posRel1 += 4
                         index += 1
                     case "FLOAT":
-                        buff[posRel:posRel + 4] = struct.pack('i', 4)  # Taille du float
+                        buff[posRel:posRel + 4] = struct.pack('i', 4)
                         buff[posRel1:posRel1 + 4] = struct.pack('f', record[index])
                         posRel += 4
                         posRel1 += 4
                         index += 1
-                    case "CHAR(T)":
-                        T = col.size  # Taille maximale pour CHAR(T)
-                        value = record[index].ljust(T, '$')[:T]  # Remplir avec '$' si nécessaire
-                        buff[posRel:posRel + 4] = struct.pack('i', T)  # Taille fixe pour CHAR(T)
-                        buff[posRel1:posRel1 + T] = value.encode('utf-8')
-                        posRel += 4
-                        posRel1 += T
+                    case _ if col.ColType.startswith("CHAR"):
+                        tailleTxt = ""
+                        for i in range(5, len(col.colType)):
+                            if (col.colType[i] != ")"):
+                                tailleTxt += col.colType[i]
+                            else:
+                                break
+                        taille = int(tailleTxt)
+                        textCol = record[index]
+                        if len(record[index]) < taille:
+                            for i in range(len(textCol), taille):
+                                textCol += "$"
+                        buff[posRel:posRel + taille] = struct.pack('f', textCol)
                         index += 1
-                    case "VARCHAR(T)":
-                        T = col.size  # Taille maximale pour VARCHAR(T)
-                        value = record[index][:T]  # Tronquer si nécessaire
-                        actual_length = len(value)
-                        buff[posRel:posRel + 4] = struct.pack('i', actual_length)  # Taille réelle
-                        buff[posRel1:posRel1 + actual_length] = value.encode('utf-8')
+                    case _ if col.ColType.startswith("VARCHAR"):
+                        buff[posRel:posRel + 4] = len(record[index])
+                        buff[posRel1:posRel1 + len(record[index])] = struct.pack('i', record[index])
                         posRel += 4
-                        posRel1 += actual_length
+                        posRel1 += len(record[index])
                         index += 1
-
             return posRel1 - pos
+
 
 def readFromBuffer(self, record, buff, pos):
     if self.tailleVar == False:
@@ -109,14 +112,18 @@ def readFromBuffer(self, record, buff, pos):
                     record[index] = struct.unpack('i', buff[posRel:posRel + 4])[0]
                     posRel += 4
                     index += 1
-                case "CHAR(T)":
-                    # il faut trouver un moyen de savoir la taille T du char
+                case _ if col.ColType.startswith("CHAR"):
+                    tailleTxt = ""
+                    for i in range(5, len(col.colType)):
+                        if (col.colType[i] != ")"):
+                            tailleTxt += col.colType[i]
+                        else:
+                            break
+                    taille = int(tailleTxt)
+                    record[index] = struct.unpack('f', buff[posRel:posRel + taille])[0]
                     index += 1
-                case "VARCHAR(T)":
-                    # il faut trouver un moyen de savoir la taille T du char
-                    index += 1
-
         return posRel - pos
+
     else:
         posRel = pos  # la on vas incrire les tailles des cols
         posRel1 = pos + self.nbCollumn * 4  # la c'est les valeurs des cols
