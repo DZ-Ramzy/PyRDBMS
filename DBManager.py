@@ -1,3 +1,5 @@
+import json
+import os
 class DBManager:
     def __init__(self, db_config):
       
@@ -96,6 +98,56 @@ class DBManager:
         # Construire le schéma à partir des colonnes de la relation
             schema = ", ".join(relation.colInfoList) #concaténer les éléments de la liste en la sépareant par , 
             print(f"CREATE TABLE {table_name} ({schema})")
+
+    def SaveState(self):
+    #Sauvegarde l'état actuel des bases de données et des tables dans un fichier JSON.
+        save_path = os.path.join(self.db_config.get_dbpath(), "databases.save") #Construit le chemin vers le fichier databases.save en le plaçant dans le répertoire défini par dbpath.
+        data_to_save = {"databases": {}} #les accolades extérieures définissent le contenu global du fichier JSON 
+        for db_name, db_instance in self.databases.items():
+            db_info = {"tables": {}}   #Crée un dictionnaire db_info pour stocker les informations des tables de la base courante.
+            for table_name, relation in db_instance.tables.items(): #Parcourt chaque table de la base courante (db_instance.tables).    
+                db_info["tables"][table_name] = { #créer un dictionnaire dans le dictionnaires des tables 
+                    "columns": relation.colInfoList, #Liste des colonnes et leurs types
+                    "headerPageId": relation.headerPageId, #Identifiant de la page d'en-tête de la table    
+                }
+            data_to_save["databases"][db_name] = db_info    #Ajoute les informations de la base courante (db_info) sous la clé correspondant à son nom (db_name) dans data_to_save qui represente notre JSON
+        try:
+            with open(save_path, "w") as save_file: 
+                json.dump(data_to_save, save_file, indent=4) #Écrit le contenu de data_to_save dans le fichier, en format JSON et indent=4 formate le fichier pour qu'il soit lisible (avec une indentation de 4 espaces).
+            print(f"État sauvegardé dans {save_path}")
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde : {e}")
+            
+
+    def LoadState(self):
+    #Charge l'état des bases de données et des tables à partir du fichier de sauvegarde JSON.
+        save_path = os.path.join(self.db_config.get_dbpath(), "databases.save") #prépare l'endroit où le fichier devrait se trouver
+        if not os.path.exists(save_path):
+            print(f"Fichier de sauvegarde introuvable : {save_path}")
+            return
+        try:
+            with open(save_path, "r") as save_file:
+                loaded_data = json.load(save_file) #charger le contenu du fichier Json dans un dictionnaire Python 
+            for db_name, db_info in loaded_data.get("databases", {}).items(): #Parcourir chaque base de données enregistrée dans le fichier
+                # Créer la base de données
+                new_db = Database(db_name)
+                for table_name, table_info in db_info["tables"].items():
+                    # Créer la relation avec les colonnes et le headerPageId
+                    new_relation = Relation(
+                        table_name,
+                        len(table_info["columns"]),
+                        table_info["columns"], #Liste des colonnes 
+                        False,  # Suppose tailleVar est False
+                        None,  # bufferManager non nécessaire ici
+                        table_info["headerPageId"],
+                    )
+                    new_db.tables[table_name] = new_relation #ajouter la nouvelle relation a la base de courante 
+                self.databases[db_name] = new_db             #Ajouter la base de données courante (new_db) au dictionnaire des bases (self.databases)
+
+            print(f"État chargé depuis {save_path}")
+        except Exception as e:
+            print(f"Erreur lors du chargement : {e}")
+   
 
 
 
