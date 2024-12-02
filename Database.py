@@ -27,34 +27,3 @@ class Database:
         self.tables = tables
 
 
-  #########################################################UN PLUS ################################################################
-
-    def create_table(self, table_name, columns, taille_var=False):
-        """Créer une nouvelle table."""
-        if table_name in self.tables:
-            raise ValueError(f"La table '{table_name}' existe déjà dans la base de données '{self.name}'.")
-        self.tables[table_name] = Relation(
-            relationName=table_name,
-            nbCollumn=len(columns),
-            colInfoList=columns,
-            tailleVar=taille_var,
-            bufferManager=None,  # À adapter si nécessaire
-            headerPageId=None    # À adapter si nécessaire
-        )
-        print(f"Table '{table_name}' créée dans la base de données '{self.name}'.")
-
-    def drop_table(self, table_name):
-        """Supprimer une table."""
-        if table_name not in self.tables:
-            raise ValueError(f"La table '{table_name}' n'existe pas dans la base de données '{self.name}'.")
-        del self.tables[table_name]
-        print(f"Table '{table_name}' supprimée de la base de données '{self.name}'.")
-
-    def list_tables(self):
-        """Lister les tables de la base de données."""
-        if not self.tables:
-            print(f"Aucune table dans la base de données '{self.name}'.")
-        else:
-            print(f"Tables dans la base de données '{self.name}':")
-            for table_name, relation in self.tables.items():
-                print(f"- {table_name} : {relation.getCol_info_list()}")
