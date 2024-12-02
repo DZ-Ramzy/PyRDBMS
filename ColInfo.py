@@ -9,3 +9,5 @@ class ColInfo:
     def get_colType(self):
         return self.colType
 
+    def __str__(self):
+        return f"{self.colNom}:{self.colType}"
