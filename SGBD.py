@@ -21,7 +21,7 @@ class SGBD:
 
     def ProcessSetCurrentDatabaseCommand(self, cmd):
         nom = cmd.split()[2]
-        self.dbManager.Createdatabase(nom)
+        self.dbManager.SetCurrentDatabase(nom)
     
     def ProcessAddTableToCurrentDatabaseCommand(self, cmd):
         nom = cmd.split()[2] #recuperer le nom
